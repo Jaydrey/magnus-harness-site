@@ -1,0 +1,14 @@
+{
+  "name": "magnus-harness-site",
+  "version": "1.0.0",
+  "description": "Public home page, privacy policy and terms of service for the Magnus Harness desktop app.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/server.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
