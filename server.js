@@ -61,7 +61,6 @@ const homePage = layout(
   'Magnus Harness',
   `<h1>Magnus Harness</h1>
 <p class="lead">Magnus Harness is a desktop app for macOS. You chat with an AI agent that works on your Mac: it reads and edits files in the folders you choose, runs commands, and uses connected accounts, with a permission setting in each chat that decides which actions ask you first.</p>
-<p>Magnus Harness is a personal learning project.</p>
 
 <h2>Why Magnus Harness asks for access to your Google data</h2>
 <p>You can connect one or more Google accounts in the app's Settings. The agent in a chat can then help with your Google data when you ask it to:</p>
@@ -130,7 +129,7 @@ const termsPage = layout(
 <p>These terms apply when you use the Magnus Harness desktop app for macOS.</p>
 
 <h2>The app</h2>
-<p>Magnus Harness is a personal learning project. It is provided as it is, without any warranty, and may change or stop working at any time.</p>
+<p>Magnus Harness is provided as it is, without any warranty, and may change or stop working at any time.</p>
 
 <h2>Your responsibility</h2>
 <ul>
