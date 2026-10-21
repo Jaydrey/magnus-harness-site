@@ -1,18 +1,8 @@
 'use strict';
 
-const http = require('node:http');
-const fs = require('node:fs');
-const path = require('node:path');
-
-const contactEmail = (process.env.CONTACT_EMAIL || '').trim();
-if (contactEmail === '') {
-  console.error(
-    'CONTACT_EMAIL is not set. Set it to the address that answers privacy and support questions, then start the server again.'
-  );
-  process.exit(1);
-}
-
-const port = Number.parseInt(process.env.PORT || '3000', 10);
+const userDataPolicyUrl = 'https://developers.google.com/terms/api-services-user-data-policy';
+const lastUpdated = '21 October 2026';
+const contentSecurityPolicy = "default-src 'none'; style-src 'self'; img-src 'self'";
 
 function escapeHtml(value) {
   return String(value)
@@ -23,43 +13,46 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-const email = escapeHtml(contactEmail);
-const emailLink = `<a href="mailto:${email}">${email}</a>`;
-const userDataPolicyUrl = 'https://developers.google.com/terms/api-services-user-data-policy';
-const lastUpdated = '21 October 2026';
+// Returns the site's pages keyed by output path. `email` must already be HTML-escaped.
+// Links are relative so the site works under a path prefix such as /magnus-harness-site/.
+function buildPages(email) {
+  const emailLink = `<a href="mailto:${email}">${email}</a>`;
 
-function layout(title, body) {
-  return `<!doctype html>
+  function layout(root, title, body) {
+    return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy}">
+<meta name="referrer" content="no-referrer">
 <title>${title}</title>
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="${root}style.css">
 </head>
 <body>
 <header class="site-header">
-<a class="brand" href="/">Magnus Harness</a>
+<a class="brand" href="${root || './'}">Magnus Harness</a>
 </header>
 <main>
 ${body}
 </main>
 <footer class="site-footer">
 <nav aria-label="Legal">
-<a href="/">Home</a>
-<a href="/privacy">Privacy Policy</a>
-<a href="/terms">Terms of Service</a>
+<a href="${root || './'}">Home</a>
+<a href="${root}privacy/">Privacy Policy</a>
+<a href="${root}terms/">Terms of Service</a>
 </nav>
 <p>Contact: ${emailLink}</p>
 </footer>
 </body>
 </html>
 `;
-}
+  }
 
-const homePage = layout(
-  'Magnus Harness',
-  `<h1>Magnus Harness</h1>
+  const homePage = layout(
+    '',
+    'Magnus Harness',
+    `<h1>Magnus Harness</h1>
 <p class="lead">Magnus Harness is a desktop app for macOS. You chat with an AI agent that works on your Mac: it reads and edits files in the folders you choose, runs commands, and uses connected accounts, with a permission setting in each chat that decides which actions ask you first.</p>
 
 <h2>Why Magnus Harness asks for access to your Google data</h2>
@@ -71,12 +64,13 @@ const homePage = layout(
 <li><strong>Google Photos</strong>: read only the photos you pick in Google's photo picker, upload photos and create albums.</li>
 </ul>
 <p>Magnus Harness requests this access only so the agent can do these tasks for you. The app on your Mac talks to Google directly. Reads run without asking. The chat's permission setting decides whether the app asks you before each change.</p>
-<p>Read the <a href="/privacy">Privacy Policy</a> for what Google data is accessed and how it is used, stored and shared.</p>`
-);
+<p>Read the <a href="privacy/">Privacy Policy</a> for what Google data is accessed and how it is used, stored and shared.</p>`
+  );
 
-const privacyPage = layout(
-  'Privacy Policy - Magnus Harness',
-  `<h1>Privacy Policy</h1>
+  const privacyPage = layout(
+    '../',
+    'Privacy Policy - Magnus Harness',
+    `<h1>Privacy Policy</h1>
 <p class="meta">Last updated ${lastUpdated}</p>
 <p>This policy explains how the Magnus Harness desktop app for macOS handles Google user data. Contact ${emailLink} with any question about it.</p>
 
@@ -120,11 +114,12 @@ const privacyPage = layout(
 
 <h2>Contact</h2>
 <p>Questions about this policy or about your data: ${emailLink}.</p>`
-);
+  );
 
-const termsPage = layout(
-  'Terms of Service - Magnus Harness',
-  `<h1>Terms of Service</h1>
+  const termsPage = layout(
+    '../',
+    'Terms of Service - Magnus Harness',
+    `<h1>Terms of Service</h1>
 <p class="meta">Last updated ${lastUpdated}</p>
 <p>These terms apply when you use the Magnus Harness desktop app for macOS.</p>
 
@@ -142,59 +137,17 @@ const termsPage = layout(
 <p>Your use of Google services through the app is also subject to Google's terms. Your use of the AI model service you connect, such as Anthropic's Claude, is subject to that service's terms.</p>
 
 <h2>Privacy</h2>
-<p>The <a href="/privacy">Privacy Policy</a> explains how the app handles Google user data.</p>
+<p>The <a href="../privacy/">Privacy Policy</a> explains how the app handles Google user data.</p>
 
 <h2>Contact</h2>
 <p>Questions about these terms: ${emailLink}.</p>`
-);
+  );
 
-const stylesheet = fs.readFileSync(path.join(__dirname, 'style.css'));
-
-const routes = {
-  '/': { type: 'text/html; charset=utf-8', body: homePage },
-  '/privacy': { type: 'text/html; charset=utf-8', body: privacyPage },
-  '/terms': { type: 'text/html; charset=utf-8', body: termsPage },
-  '/style.css': { type: 'text/css; charset=utf-8', body: stylesheet },
-  '/healthz': { type: 'text/plain; charset=utf-8', body: 'ok' },
-};
-
-const securityHeaders = {
-  'Content-Security-Policy': "default-src 'none'; style-src 'self'; img-src 'self'",
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'no-referrer',
-};
-
-function send(req, res, status, type, body, extraHeaders = {}) {
-  const buffer = Buffer.isBuffer(body) ? body : Buffer.from(body, 'utf8');
-  res.writeHead(status, {
-    ...securityHeaders,
-    ...extraHeaders,
-    'Content-Type': type,
-    'Content-Length': buffer.length,
-  });
-  res.end(req.method === 'HEAD' ? undefined : buffer);
+  return {
+    'index.html': homePage,
+    'privacy/index.html': privacyPage,
+    'terms/index.html': termsPage,
+  };
 }
 
-const server = http.createServer((req, res) => {
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    send(req, res, 405, 'text/plain; charset=utf-8', 'Method not allowed', { Allow: 'GET, HEAD' });
-    return;
-  }
-  const pathname = new URL(req.url, 'http://localhost').pathname;
-  const route = Object.prototype.hasOwnProperty.call(routes, pathname) ? routes[pathname] : null;
-  if (route === null) {
-    send(req, res, 404, 'text/plain; charset=utf-8', 'Not found');
-    return;
-  }
-  send(req, res, 200, route.type, route.body);
-});
-
-server.listen(port, () => {
-  console.log(`Magnus Harness site listening on port ${server.address().port}`);
-});
-
-function shutdown() {
-  server.close(() => process.exit(0));
-}
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+module.exports = { buildPages, escapeHtml, contentSecurityPolicy };
